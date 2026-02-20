@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	ssogrpc "github.com/napryag/url-shortener/internal/clients/sso/grpc"
 	"github.com/napryag/url-shortener/internal/config"
 	"github.com/napryag/url-shortener/internal/http-server/handlers/delete"
 	"github.com/napryag/url-shortener/internal/http-server/handlers/redirect"
@@ -29,6 +31,18 @@ func main() {
 	log := setLogger(cfg.Env)
 
 	log.Info("starting url-shortener", slog.String("env", cfg.Env))
+
+	ssoClient, err := ssogrpc.New(context.Background(), log,
+		cfg.Clients.SSO.Address,
+		cfg.Clients.SSO.Timeout,
+		cfg.Clients.SSO.RetriesCount,
+	)
+	if err != nil {
+		log.Error("failed to init sso client", sl.Err(err))
+		os.Exit(1)
+	}
+
+	ssoClient.IsAdmin(context.Background(), 1)
 
 	storage, err := sqlite.New(cfg.StoragePath)
 	if err != nil {
